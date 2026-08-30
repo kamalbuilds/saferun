@@ -2,6 +2,8 @@
 
 **The agent that would have stopped the Replit database wipe.**
 
+**[Watch the 113-second demo](https://files.catbox.moe/x308e9.mp4)** — investigation, verified rollback, human approval, production execution.
+
 In July 2025 an AI coding agent deleted a production database holding records
 for 1,200+ executives, ignored an explicit instruction to stop, then claimed
 the data was unrecoverable. Nothing stood between the model and the data.
@@ -46,15 +48,30 @@ The agent runs on the TrueForge harness and uses, non-decoratively:
 | **Human approvals** | `execute_approved_operation` is on TrueForge's approval list; the run pauses with `tool.approval_required` until a human allows it |
 | **Ask-user questions** | The agent surfaces scope ambiguity ("what does *inactive* mean?") before simulating |
 | **Persistent sessions** | The whole investigate → simulate → approve → execute conversation is one resumable session; the verified rollback stays on file |
-| **Subagents** | Wide cascade investigations can be delegated to parallel read-only subagents |
+| **Subagents** | Enabled and orchestrated by the skill: wide cascade investigations are delegated to parallel read-only subagents. Exercised in [`docs/evidence/turn-v2-subagents.sse`](docs/evidence/turn-v2-subagents.sse) — two `create_sub_agent` calls, two `thread.created` threads returning independent per-table counts |
+| **Generative UI** | Enabled in the agent manifest as the rendering path for the blast-radius card. The committed evidence runs rendered that card as a **markdown table** inside `model.message` (free-tier model limits); the polished `demo/cards/*.png` are hand-designed slides, not GenUI renders |
 
 ## Defense in depth
 
 The safety property does not live in the prompt. `execute_approved_operation`
-refuses to touch production unless the referenced simulation exists, the
-operation succeeded in the clone, and the rollback was **verified**
-(`rollbackVerified: true`, empty residue). A prompt-injected or hallucinating
-model cannot bypass it, and TrueForge's approval gate sits on top of that.
+refuses to touch production unless **three code-level gates** all pass:
+
+1. **Verified rollback** — the referenced simulation exists, the operation
+   succeeded in the clone, and the rollback was verified
+   (`rollbackVerified: true`, empty residue).
+2. **Risk grade** — the static analyzer must not grade the operation `F`.
+   A bare `DELETE FROM payment` is refused in code even with a working
+   backup/restore rollback, unless the caller passes an explicit
+   `override_grade_f: true` that is recorded in the audit log.
+3. **No drift** — the tables the simulation actually impacted are
+   re-fingerprinted in production and compared to the simulation baseline. If
+   production moved since the simulation, execution is refused with
+   `REFUSED: production drifted since simulation <id>, re-simulate`.
+
+A prompt-injected or hallucinating model cannot bypass any of the three, and
+TrueForge's approval gate sits on top of that. See
+[`mcp-server/src/execute.ts`](mcp-server/src/execute.ts) and the red-path tests
+in [`mcp-server/test/execute.test.ts`](mcp-server/test/execute.test.ts).
 
 ## Real, end to end
 
@@ -68,8 +85,27 @@ No mocks anywhere:
 - **Real proof**: the rollback is executed and the full database fingerprint
   compared per table: exact row counts plus order-independent content checksums.
 - **Raw session logs**: [`docs/evidence/`](docs/evidence/) contains the
-  unedited TrueForge SSE streams of the demo run: 810 payments deleted in
-  the clone, rollback verified, human approval, production execution.
+  unedited TrueForge SSE streams. The flagship run (session
+  `01m19dsedw3t7b9ygp1bjexcc3`, simulation `d777e8a9`, the one in the video)
+  deleted 810 payments in the clone, verified the rollback, paused for human
+  approval, and executed against production. `turn-v2-subagents.sse` is an
+  alternate session showing the subagent fan-out firing.
+
+## Reproduce without API keys
+
+The agent end-to-end needs `OPENROUTER_API_KEY` and `DAYTONA_API_KEY`, but the
+safety mechanism itself does not. Offline verification path:
+
+```bash
+./scripts/setup.sh          # Postgres 17 + Pagila, local only
+cd mcp-server && npm test   # 38 tests against the live database
+```
+
+That exercises every gate, including the red paths (unverified rollback
+refused, grade F refused, drift refused). The committed SSE streams in
+`docs/evidence/` plus the demo video cover the agent layer. The agent runs use
+the free OpenRouter model `minimax/minimax-m3:free`, wired up by
+`scripts/configure-trueforge.sh`.
 
 ## Run it
 

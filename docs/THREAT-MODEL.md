@@ -25,8 +25,14 @@ works?" is replaced with "I ran it. Here is the per-table proof."
 
 `analyze_operation` queries `information_schema` for every FK relationship
 reaching or from the target tables before any SQL runs. The wide fan-out rule
-spreads per-table row-count verification across parallel subagents so no
-cascade path is counted only once by a single sequential pass.
+spreads per-table row-count verification across parallel read-only subagents so
+no cascade path is counted only once by a single sequential pass. That fan-out
+is enabled and orchestrated by the skill, and fires in
+`docs/evidence/turn-v2-subagents.sse` (two `create_sub_agent` calls, two
+`thread.created` threads, independent counts returned per table). The narrower
+flagship demo run mapped its cascade sequentially, since one table pair does not
+warrant the fan-out. FK enumeration itself is a code-level `information_schema`
+query and does not depend on subagents.
 
 ### Same-turn simulate-and-execute race
 
@@ -38,19 +44,34 @@ the harness layer for a human click.
 ### Grade-F bare-destructive operations
 
 `analyze_operation` gives grade F to any bare DELETE or UPDATE with no WHERE
-clause (score >= 55). The skill refuses to proceed past Step 0 until the human
-explicitly overrides with "proceed despite grade F". This catches the
-hallucination pattern where a model drops a WHERE clause under pressure.
+clause (score >= 55). This is enforced in **two** places. The skill refuses to
+proceed past Step 0, and `execute_approved_operation` independently re-runs the
+analyzer on the stored simulation and refuses grade F unless the caller passes
+`override_grade_f: true` (`gradeRefusal()` in `mcp-server/src/execute.ts`). A
+jailbroken model that ignores the skill text still hits the compiled gate. This
+catches the hallucination pattern where a model drops a WHERE clause under
+pressure.
+
+### Execution against a drifted production database
+
+The verified rollback is proof about the database as it stood at simulation
+time. Before writing, `execute_approved_operation` re-fingerprints the tables
+the simulation actually impacted and compares them to the simulation baseline
+(`driftRefusal()` in `mcp-server/src/execute.ts`). If any of them changed,
+execution is refused with `REFUSED: production drifted since simulation <id>,
+re-simulate`. Tables the operation itself creates are exempt, and unrelated
+write traffic to other tables does not block an approved operation.
 
 ## What it does NOT stop
 
 ### Clone-vs-production scale drift
 
 The clone is created from production at simulation time via
-`CREATE DATABASE ... TEMPLATE`. If production is under heavy write load between
-simulation and execution, the clone does not reflect inserts or updates that
-arrived after the snapshot. Row counts in the blast-radius report may be
-slightly stale. A per-row content lock before execution is out of scope.
+`CREATE DATABASE ... TEMPLATE`. The drift gate above catches changes to the
+impacted tables between simulation and execution, but the blast-radius numbers
+reported to the human are still measured on the snapshot: a table that drifted
+and was then re-simulated may report different counts than the human first saw.
+Row-level locking across the simulate/approve/execute window is out of scope.
 
 ### A malicious or compromised DBA
 
