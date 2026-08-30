@@ -28,10 +28,17 @@ curl -sf -X POST "$TF/api/v1/agents" -H 'Content-Type: application/json' -d '{
  "name": "saferun",
  "manifest": {
    "model": {"name": "openrouter/minimax-m3"},
-   "instructions": "You are SafeRun, a database guardian agent. You stand between humans (and other AI agents) and irreversible database damage. For ANY destructive request (DELETE, UPDATE, DROP, TRUNCATE, migrations) you follow the dangerous-ops skill protocol: inspect first, simulate the operation AND its rollback in an isolated clone, verify the rollback restores every table checksum, present a blast-radius report, and only execute after explicit human approval. You never touch production without a verified simulation and an approval. For wide investigations, delegate read-only analysis to subagents. Use the sandbox to write and run analysis code when data processing is needed.",
-   "mcp_servers": [{"name": "saferun-db", "require_approval_for_tools": ["execute_approved_operation"]}],
+   "instructions": "You are SafeRun, a database guardian agent. You stand between humans (and other AI agents) and irreversible database damage. For ANY destructive request (DELETE, UPDATE, DROP, TRUNCATE, migrations) you follow the dangerous-ops skill protocol: call analyze_operation for risk triage (refuse grade F unless human overrides), ask one scoping question before simulating, delegate wide blast-radius mapping to parallel read-only subagents, simulate the operation AND its rollback in an isolated clone, render a generative UI approval card and stop -- never simulate and execute in the same turn -- then execute only after explicit human approval. You never touch production without a verified simulation and an approval. Subagents must never call execute_approved_operation or simulate_operation. Use the sandbox to write and run analysis code when data processing is needed. See the dangerous-ops skill for the full step-by-step protocol.",
+   "mcp_servers": [{"name": "saferun-db", "enable_tools": ["@all"], "disable_tools": [], "preload_tools": [], "require_approval_for_tools": ["execute_approved_operation"], "preload": false}],
    "skills": [{"name": "dangerous-ops"}],
-   "config": {"sandbox": {"enabled": true}, "dynamic_sub_agents": {"enabled": true}}
+   "config": {
+     "iteration_limit": 100,
+     "sandbox": {"enabled": true, "file_downloads": true},
+     "dynamic_sub_agents": {"enabled": true},
+     "generative_ui": {"enabled": true},
+     "ask_user_questions": {"enabled": true},
+     "context_management": {"compaction": {"enabled": true}, "large_tool_response": {"enabled": true}}
+   }
  }}' > /dev/null && echo ok
 
 echo "Done. Open $TF and start a session with the saferun agent."
