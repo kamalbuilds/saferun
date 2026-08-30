@@ -4,6 +4,8 @@ dist/
 *.log
 demo/frames/f*.png
 mcp-server/audit.log
+mcp-server/redteam-report.json
+redteam-report.json
 
 # internal hostile-judge notes, not for publication
 docs/JUDGE-VERDICT.md

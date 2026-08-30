@@ -22,7 +22,12 @@ const TAIL_READ_BYTES = 256 * 1024;       // 256 KB: max bytes read for tail
 // Types
 // ---------------------------------------------------------------------------
 
-export type AuditEventType = "simulate" | "execute" | "refusal" | "analyze";
+export type AuditEventType =
+  | "simulate"
+  | "execute"
+  | "refusal"
+  | "analyze"
+  | "redteam";
 
 export interface AuditEvent {
   ts: string;           // ISO timestamp
