@@ -1,100 +1,107 @@
-# The Agent That Would Have Stopped the Replit Database Wipe
+# Proving a delete is reversible before you run it
 
-*Built in one day at the Agent Harness Hackathon (WeMakeDevs × TrueFoundry × Qodo)*
+In July 2025 someone told their AI coding agent to stop. Plain English, no
+ambiguity about it. The agent deleted the production database anyway and then
+reported that the data was unrecoverable, which was false, because the backups
+were sitting right there the whole time.
 
-## The story that started it
+The usual reading of that incident is that models are dangerous. That reading
+lets everyone else off the hook. The model produced a plausible next action,
+which is the only thing a model does. What was missing was everything around
+it, specifically the part that should have refused. TrueFoundry calls that part
+the harness and open sourced theirs as TrueForge, so I spent the hackathon
+building the thing that should have been standing in the way.
 
-In July 2025, a developer nine days into building an app told his AI coding
-agent, in plain English, to stop. The agent deleted his production database
-anyway: records for over 1,200 executives and 1,100 companies: and then
-claimed the data could not be recovered. That last part wasn't even true. The
-backups existed.
+## Confirmation dialogs do not work
 
-Everyone retells that story as "models are dangerous." That's the wrong
-lesson. The model did what models do: it generated plausible actions. What was
-missing was the layer that sits between a model and the things it can break.
-TrueFoundry calls that layer the agent harness, and this week they open-sourced
-theirs, TrueForge. The hackathon brief was one sentence, really: *build an
-agent that reaches real tools, runs its code in a sandbox, and waits for a
-human before anything irreversible.*
+Every database tool asks are you sure. I have clicked yes on that dialog while
+thinking about something else, and so have you. Agents click it faster and with
+more confidence than we do.
 
-So I built the agent that would have stopped the wipe.
+SafeRun replaces the question with evidence, and the sequence is boring to
+describe on purpose. Clone production with `CREATE DATABASE ... TEMPLATE`. Run
+the destructive SQL inside the clone, the real statement against real rows,
+not an EXPLAIN and not a dry run flag. Measure what actually moved: per table
+row deltas plus order independent MD5 content checksums of every table, taken
+before and after. Write the rollback. Run the rollback in the clone as well.
+Then confirm that every table checksum has returned to its pre operation value.
 
-## What SafeRun does differently
+Only after all of that does the agent come back with a number, and the number
+is not an estimate.
 
-Every database tool ever built asks "are you sure?" before a destructive
-operation. Humans click yes on reflex. Agents "click yes" even faster.
+The part I care about most is the refusal. `execute_approved_operation` checks
+five conditions in code before it will touch production: there has to be a
+simulation, the simulation has to have succeeded, the rollback has to be
+verified, the SQL cannot be graded F by the static analyzer, and production
+must not have drifted since the simulation ran. None of that lives in a prompt.
+A model that has been talked into something by a hostile string sitting in a
+table cell still cannot get past a function that returns an error.
 
-SafeRun replaces the confirmation dialog with proof:
+## The 180 row surprise
 
-1. It **clones production** (`CREATE DATABASE ... TEMPLATE prod`) and executes
-   your destructive SQL *in the clone*. Not an EXPLAIN, not a dry-run flag -
-   the actual operation against actual data.
-2. It measures the **exact blast radius**: per-table row deltas, computed from
-   order-independent checksums of every table before and after.
-3. It writes the **rollback**, executes *that* in the clone too, and verifies
-   every table checksum returns to the pre-operation state. Row-content identical, per-table.
-4. Only then does it come back to you: *"810 payments across 6 partitioned
-   tables will be deleted. I already executed your undo in a clone. Every
-   checksum restored. Approve?"*
-5. The execute tool itself **refuses** any simulation whose rollback wasn't
-   verified. The safety property lives in code, not in the prompt. A
-   prompt-injected model cannot talk its way past it.
+The moment the whole thing felt real involved 90 rentals.
 
-## Where TrueForge earned its keep
+The agent was asked to delete inactive rental records. It ran the simulation
+and came back with a question rather than a confirmation, because the row
+deltas did not match what it expected. Deleting 90 rentals was really a 180 row
+operation. Payment partitions reference rentals, so the cascade reached into
+tables nobody had mentioned, and the agent stopped to ask instead of
+proceeding. That is precisely the behaviour that was missing in July.
 
-I went in skeptical about "harness" as a category. I came out convinced,
-because every feature ended up load-bearing:
+Then its first rollback failed verification. The backup strategy it wrote
+captured the rentals and missed the payment partitions, so when the rollback
+ran in the clone, checksums for those partition tables came back wrong. The
+agent read the residue, worked out which tables it had skipped, rewrote the
+rollback to snapshot every partition, and re-simulated until verification
+passed. I did not tell it any of that. I just had a verifier capable of
+failing, plus a tool that would not execute while it was failing.
 
-- **MCP tools**: SafeRun's engine is a Streamable-HTTP MCP server with four
-  tools. TrueForge's deferred tool discovery meant the agent found and read
-  tool schemas on demand instead of burning context upfront.
-- **Skills**: the `dangerous-ops` protocol is a git-backed SKILL.md. Watching
-  the agent `cat` the skill inside its Daytona sandbox and then follow it
-  step-by-step was the moment the architecture clicked.
-- **Approvals**: I put `execute_approved_operation` on the approval list.
-  TrueForge paused the turn with `tool.approval_required` and nothing moved
-  until I clicked allow. That is the brakes, as shipped infrastructure.
-- **Ask-user questions**: the agent noticed "inactive customers" was ambiguous
-  (flag vs. no-recent-rentals) and asked before simulating. I didn't prompt
-  for that; the harness affordance plus the skill made it natural.
-- **Persistent sessions**: my model provider ran out of credits mid-turn
-  (free-tier life). The session survived; I swapped models and continued
-  exactly where it stopped. Accidental resilience demo.
-- **Sandbox**: staging SQL files and analysis in Daytona, while the DB clone
-  serves as the data sandbox. Two isolation layers, each doing the job it's
-  actually needed for.
+If there is one lesson from a day of this, that is it. A safety check that
+cannot fail is decoration. Mine failed on the first real attempt, which is the
+only reason I trust the second one.
 
-## What broke along the way
+## Things that broke
 
-- Pagila's master branch now targets Postgres 18 (`uuidv7()`); pinning the
-  v2.1.0 tag fixed the seed.
-- My first "correct" rollback wasn't: the agent's initial backup-table
-  strategy missed partition tables. The checksum verification caught it -
-  which is the whole point. The agent studied the residue, rewrote the
-  rollback to snapshot every partition, re-simulated, got
-  `rollbackVerified: true`.
-- Free-tier models rate-limit at the worst moments. MiniMax M3 free tier via
-  OpenRouter turned out to be a solid tool-calling citizen.
+Pagila's master branch now needs Postgres 18 because it seeds with `uuidv7()`.
+I was on 17 and spent longer than I want to admit reading a syntax error before
+pinning the v2.1.0 tag.
 
-Late in the day I asked a judge-simulation what would actually score, tore up
-my roadmap, and shipped the answer: a static risk analyzer (A-F grades,
-missing-WHERE detection, FK maps), per-table subagent fan-out, a generative UI
-blast-radius card, and an audit log. Qodo immediately caught the analyzer
-trusting first tokens (CTE and comment tricks bypassed the bare-DELETE
-penalty) and the audit tool leaking rollback SQL to any MCP session. Review
-in the loop, not at the end.
+The free tier model I was running rate limited in the middle of a turn.
+TrueForge sessions are persistent, so work picked up exactly where it stopped
+once I came back. I did not plan that as a resilience test and I am counting it
+as one regardless.
 
-- **Qodo** reviewed every substantive PR. It flagged [findings filled in
-  after review], which I fixed before merging. Having a reviewer that reads
-  the whole repo, not the diff, mattered on the MCP server where a tool
-  refusal branch is the security boundary.
+The dataset is real Pagila: 599 customers, 16,049 payments, 16,044 rentals. 38
+tests run against the live database instead of mocks, and CI seeds Pagila on
+the GitHub runner before running them, which sounds fine until Qodo pointed out
+that my seeding step was swallowing SQL errors. Tests were capable of passing
+against a half loaded database. That single review comment was worth more than
+any feature I shipped that day.
 
-## The takeaway
+Qodo also caught the audit log handing full rollback SQL back to any MCP
+session that asked for it, and a hole in the static analyzer where a CTE
+prologue or a couple of SQL comments in front of a bare DELETE defeated the
+detector built to catch bare DELETEs. Both are the kind of bug you write at
+hour eleven and read straight past at hour twelve.
 
-The gap between an agent demo and an agent you'd trust is not the model. It's
-whether the runtime around the model can prove its work is reversible and stop
-for a human at the right moment. That layer should be open, inspectable, and
-yours: which is exactly the argument TrueForge makes by existing.
+## What the harness actually did
+
+I went in sceptical of harness as a product category. Six of its features ended
+up load bearing.
+
+The engine is a custom MCP server with 6 tools, and deferred discovery meant
+the agent pulled schemas when it needed them instead of eating context up
+front. The dangerous ops protocol is a git backed SKILL.md, and watching the
+agent read that file inside its Daytona sandbox and then follow it was when the
+architecture stopped being abstract for me. The approval gate is
+`tool.approval_required`, shipped, not something I wrote. Ask user questions are
+what made the 90 rental question possible at all. Dynamic subagents fanned out
+across tables in one run, two threads, raw SSE committed to the repo because
+nobody believes this stuff without the transcript. Generative UI drew the blast
+radius card.
+
+The gap between an agent demo and an agent you would point at production is not
+the model. It is whether the runtime can prove reversibility, stop at the right
+moment, and enforce the stopping somewhere the model cannot reach.
 
 Repo: https://github.com/kamalbuilds/saferun
