@@ -4,7 +4,7 @@ import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { StreamableHTTPServerTransport } from "@modelcontextprotocol/sdk/server/streamableHttp.js";
 import { z } from "zod";
 import { fingerprintDatabase, loadConfig, poolFor } from "./db.js";
-import { getSimulation, simulateOperation } from "./simulate.js";
+import { getSimulation, refusalReason, simulateOperation } from "./simulate.js";
 
 const cfg = loadConfig();
 
@@ -106,42 +106,16 @@ function buildServer(): McpServer {
     },
     async ({ simulation_id }) => {
       const sim = getSimulation(simulation_id);
-      if (!sim) {
+      const refusal = refusalReason(sim, simulation_id);
+      if (refusal) {
         return {
-          content: [
-            {
-              type: "text",
-              text: `REFUSED: no simulation with id ${simulation_id}. Run simulate_operation first.`,
-            },
-          ],
-          isError: true,
-        };
-      }
-      if (!sim.operationOk) {
-        return {
-          content: [
-            {
-              type: "text",
-              text: `REFUSED: operation failed in sandbox: ${sim.operationError}`,
-            },
-          ],
-          isError: true,
-        };
-      }
-      if (!sim.rollbackVerified) {
-        return {
-          content: [
-            {
-              type: "text",
-              text: `REFUSED: rollback was NOT verified in the sandbox. Residue: ${JSON.stringify(sim.rollbackResidue)}. Fix the rollback and re-simulate.`,
-            },
-          ],
+          content: [{ type: "text", text: refusal }],
           isError: true,
         };
       }
       const pool = poolFor(cfg, cfg.productionDb);
       const before = await fingerprintDatabase(cfg, cfg.productionDb);
-      await pool.query(sim.operation);
+      await pool.query(sim!.operation);
       const after = await fingerprintDatabase(cfg, cfg.productionDb);
       const changed = after.filter(
         (a) => before.find((b) => b.table === a.table)?.checksum !== a.checksum,
@@ -156,7 +130,7 @@ function buildServer(): McpServer {
                 database: cfg.productionDb,
                 simulationId: simulation_id,
                 tablesChanged: changed.map((c) => c.table),
-                verifiedRollbackOnFile: sim.rollback,
+                verifiedRollbackOnFile: sim!.rollback,
               },
               null,
               2,
