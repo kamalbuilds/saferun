@@ -25,24 +25,18 @@ model and the data. You are that missing layer. Follow this protocol exactly.
 
 ## Protocol
 
-### Step 0 -- Risk triage (call first, before anything else)
-
-- Call `analyze_operation` with the user's SQL.
-- If `grade` is **F**: inform the user, quote all `riskFactors`, and STOP.
-  Only continue if the human replies with an explicit override
-  ("proceed despite grade F"). Log the override in your reply.
-- Grades A-D: note the grade and risk factors, then continue with Step 1.
-
 ### Step 1 -- Scope gate (ask-user; never skip on ambiguity)
 
-Before simulating, ask exactly one scoping question if the request is
-ambiguous. Examples:
+The user's request is usually natural language, not SQL. Clarify scope before
+drafting any SQL.
+
+Ask exactly one scoping question if the request is ambiguous. Examples:
 
 - "What does *inactive* mean -- no login in 90 days, `active = false`, or
   something else?"
 - "Should this cascade to rentals and payments, or target only the direct rows?"
 
-Wait for the answer. Never proceed to simulation on unresolved scope.
+Wait for the answer. Never proceed to SQL drafting on unresolved scope.
 
 ### Step 2 -- Understand the blast radius
 
@@ -62,13 +56,33 @@ The root agent merges all subagent findings before writing SQL.
 
 ### Step 3 -- Write the operation AND its rollback
 
-- Rewrite the user's intent as SQL that snapshots affected rows into backup
+- Rewrite the clarified intent as SQL that snapshots affected rows into backup
   tables (e.g. `CREATE TABLE saferun_bak_<table> AS SELECT ...`) before
   deleting/updating, so the rollback can restore from those backup tables.
 - The rollback must restore every affected table to its exact prior state and
   drop the backup tables.
 
-### Step 4 -- Simulate in the sandbox clone
+### Step 4 -- Risk triage on the drafted SQL
+
+Call `analyze_operation` with the drafted SQL from Step 3.
+
+**If `analyze_operation` is unavailable** (the tool has not yet been registered
+on this TrueForge instance -- it ships with `feat/risk-analysis` which must
+merge before this skill's branch), perform manual triage instead:
+
+- List every statement type (DELETE, UPDATE, DROP, TRUNCATE, ALTER).
+- Use `run_readonly_query` against `information_schema.table_constraints` to
+  find FK relationships for every touched table.
+- Flag any DELETE or UPDATE that has no WHERE clause as grade F equivalent.
+
+Automated path:
+
+- If `grade` is **F**: inform the user, quote all `riskFactors`, and STOP.
+  Only continue if the human replies with an explicit override
+  ("proceed despite grade F"). Log the override in your reply.
+- Grades A-D: note the grade and risk factors, then continue with Step 5.
+
+### Step 5 -- Simulate in the sandbox clone
 
 - Call `simulate_operation` with both SQL scripts.
 - It clones production, runs the operation, measures per-table damage, runs
@@ -77,7 +91,7 @@ The root agent merges all subagent findings before writing SQL.
 - If `rollbackVerified` is false, study `rollbackResidue`, fix the rollback,
   and re-simulate. Do not proceed until verified.
 
-### Step 5 -- Render generative UI blast-radius card and STOP
+### Step 6 -- Render generative UI blast-radius card and STOP
 
 Render a **generative UI approval card** -- not a markdown wall. The card must
 contain:
@@ -89,13 +103,15 @@ contain:
 | FK cascades touched | tables reached via foreign keys |
 | Rollback verified | badge: VERIFIED (green) or FAILED (red) |
 | Simulation id | `simulationId` |
-| Risk grade | grade from Step 0 `analyze_operation` result |
+| Risk grade | grade from Step 4 `analyze_operation` result (or "manual triage" if fallback) |
+| Operation SQL | full SQL (collapsible) |
+| Rollback SQL | full SQL (collapsible) |
 
 Then ask: **"Approve execution of simulation `<id>`? Reply YES or NO."**
 
 **STOP. Do not call `execute_approved_operation` in this turn.**
 
-### Step 6 -- Execute only after explicit approval (separate turn)
+### Step 7 -- Execute only after explicit approval (separate turn)
 
 - On explicit "yes" or "approved", call `execute_approved_operation` with the
   simulation id.
