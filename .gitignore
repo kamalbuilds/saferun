@@ -2,3 +2,4 @@ node_modules/
 dist/
 .pgdata/
 *.log
+demo/frames/f*.png
