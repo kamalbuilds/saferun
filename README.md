@@ -97,7 +97,7 @@ npx @truefoundry/trueforge   # http://localhost:8790
 cd mcp-server && npm test
 ```
 
-Seven tests against the live database, covering the red path (broken rollback
+Eight tests against the live database (in PR #1 until merged), covering the red path (broken rollback
 → execution refused), the green path (verified row-content-identical restore), and
 production isolation (simulation never mutates production).
 

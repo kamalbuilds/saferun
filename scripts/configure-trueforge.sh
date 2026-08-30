@@ -6,20 +6,13 @@ set -euo pipefail
 TF=${TF:-http://localhost:8790}
 
 echo "== model provider (OpenRouter, free tool-calling model)"
-curl -sf -X POST "$TF/api/v1/settings/model-providers" -H 'Content-Type: application/json' -d "{
- \"manifest\": {
-  \"type\": \"custom\",
-  \"name\": \"openrouter\",
-  \"base_url\": \"https://openrouter.ai/api/v1\",
-  \"auth\": {\"api_key\": \"$OPENROUTER_API_KEY\"},
-  \"models\": [
-    {\"model_id\": \"minimax/minimax-m3:free\", \"name\": \"minimax-m3\", \"properties\": {\"context_length\": 200000, \"max_output_tokens\": 16000}}
-  ]
- }}" > /dev/null && echo ok
+# Secrets are piped via stdin (--data @-), never exposed in argv.
+jq -n --arg key "$OPENROUTER_API_KEY" '{manifest:{type:"custom",name:"openrouter",base_url:"https://openrouter.ai/api/v1",auth:{api_key:$key},models:[{model_id:"minimax/minimax-m3:free",name:"minimax-m3",properties:{context_length:200000,max_output_tokens:16000}}]}}' \
+  | curl -sf -X POST "$TF/api/v1/settings/model-providers" -H 'Content-Type: application/json' --data @- > /dev/null && echo ok
 
 echo "== Daytona sandbox provider"
-curl -sf -X PUT "$TF/api/v1/settings/sandbox-providers" -H 'Content-Type: application/json' -d "{
- \"manifest\": {\"type\": \"daytona\", \"auth\": {\"api_key\": \"$DAYTONA_API_KEY\"}, \"exec_timeout_ms\": 120000, \"auto_stop_interval_in_minutes\": 15, \"auto_archive_interval_in_minutes\": 60, \"auto_delete_interval_in_minutes\": 120}}" > /dev/null && echo ok
+jq -n --arg key "$DAYTONA_API_KEY" '{manifest:{type:"daytona",auth:{api_key:$key},exec_timeout_ms:120000,auto_stop_interval_in_minutes:15,auto_archive_interval_in_minutes:60,auto_delete_interval_in_minutes:120}}' \
+  | curl -sf -X PUT "$TF/api/v1/settings/sandbox-providers" -H 'Content-Type: application/json' --data @- > /dev/null && echo ok
 
 echo "== saferun-db MCP connector"
 curl -sf -X POST "$TF/api/v1/settings/mcp-servers" -H 'Content-Type: application/json' -d '{
