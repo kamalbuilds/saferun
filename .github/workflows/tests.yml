@@ -58,3 +58,9 @@ jobs:
       - name: Tests (live database)
         working-directory: mcp-server
         run: npm test
+
+      # The safety claim is a release gate: if any attack reaches the database,
+      # or the control stops executing, this job fails.
+      - name: Prove the gate (adversarial self-test)
+        working-directory: mcp-server
+        run: npm run redteam

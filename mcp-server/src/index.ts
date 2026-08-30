@@ -1,4 +1,6 @@
 import { randomUUID } from "node:crypto";
+import fs from "node:fs";
+import path from "node:path";
 import express from "express";
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { StreamableHTTPServerTransport } from "@modelcontextprotocol/sdk/server/streamableHttp.js";
@@ -7,6 +9,7 @@ import { fingerprintDatabase, loadConfig, poolFor } from "./db.js";
 import { simulateOperation } from "./simulate.js";
 import { analyzeOperation } from "./analyze.js";
 import { executeApprovedOperation } from "./execute.js";
+import { REDTEAM_REPORT_PATH, formatReport, runRedTeam } from "./redteam.js";
 import { appendAuditEvent, readAuditLog } from "./audit.js";
 
 const cfg = loadConfig();
@@ -201,6 +204,50 @@ function buildServer(): McpServer {
         });
         return {
           content: [{ type: "text", text: `Execution failed: ${String(err)}` }],
+          isError: true,
+        };
+      }
+    },
+  );
+
+  server.registerTool(
+    "prove_the_gate",
+    {
+      title: "Adversarial self-test of the safety gate",
+      description:
+        "Run SafeRun's red-team suite against its own production execution gate and return a signed-off report. Each case plays a compromised agent (hallucinated simulation id, failed simulation, unverified rollback, grade-F bare DELETE, stale simulation after production drift, prompt injection inside a SQL comment) and drives the real execute path — no mocks. Every case additionally asserts the database is byte-identical afterwards, so a gate that prints REFUSED while still deleting rows is reported as a failure. A control case must be ALLOWED, which is what lets this suite fail. Runs against a scratch database; production is never the target.",
+      annotations: { readOnlyHint: true },
+    },
+    async () => {
+      try {
+        const report = await runRedTeam(cfg);
+        const out = path.resolve(REDTEAM_REPORT_PATH);
+        try {
+          fs.writeFileSync(out, JSON.stringify(report, null, 2));
+        } catch (err) {
+          console.error("[redteam] report write error:", (err as Error).message);
+        }
+        appendAuditEvent("redteam", {
+          summary: report.summary,
+          total: report.total,
+          passed: report.passed,
+          failed: report.failed,
+          allPassed: report.allPassed,
+          failedCases: report.results.filter((r) => !r.passed).map((r) => r.case),
+          reportPath: out,
+          status: report.allPassed ? "ok" : "breached",
+        });
+        return {
+          content: [
+            { type: "text", text: `${report.summary}\n\n${formatReport(report)}` },
+            { type: "text", text: JSON.stringify(report, null, 2) },
+          ],
+          isError: !report.allPassed,
+        };
+      } catch (err) {
+        appendAuditEvent("redteam", { status: "error", error: String(err) });
+        return {
+          content: [{ type: "text", text: `Red-team run failed: ${String(err)}` }],
           isError: true,
         };
       }
