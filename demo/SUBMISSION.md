@@ -21,19 +21,24 @@ It refuses to act until it has:
    approval gate
 
 Only after an explicit allow does `execute_approved_operation` run, and that
-tool refuses at code level any simulation whose rollback was not verified.
-The safety boundary is unpromptable.
+tool refuses at code level any simulation whose rollback was not verified, any
+operation the static analyzer grades F (unless `override_grade_f: true` is
+passed explicitly), and any execution whose impacted tables drifted in
+production since the simulation. The safety boundary is unpromptable.
 
-## TrueForge features used (all load-bearing)
+## TrueForge features used
 
-- MCP tools (custom saferun-db server, 4 tools, deferred discovery)
+- MCP tools (custom saferun-db server, 6 tools, deferred discovery)
 - Skills (git-backed dangerous-ops SKILL.md protocol)
 - Daytona sandbox (SQL staging and analysis)
 - Human approvals (execute tool on the approval list)
 - Ask-user questions (scope disambiguation before simulating)
 - Persistent sessions (investigation -> simulation -> approval -> execution in
   one resumable session; survived a mid-turn model outage)
-- Subagents enabled for parallel cascade investigation
+- Subagent fan-out for wide cascade investigation: two `create_sub_agent`
+  threads in `docs/evidence/turn-v2-subagents.sse`
+- Generative UI enabled as the approval-card rendering path; the committed
+  evidence runs rendered that card as a markdown table (free-tier model limits)
 
 ## No mocks
 
@@ -43,5 +48,5 @@ Daytona sandboxes, raw SSE session logs committed under docs/evidence/.
 ## Links
 
 - Repo: https://github.com/kamalbuilds/saferun
-- Demo video: demo/saferun-demo.mp4 (also linked in submission form)
+- Demo video: https://files.catbox.moe/x308e9.mp4 (also demo/saferun-demo.mp4 in the repo)
 - Qodo evidence: README section + PR history

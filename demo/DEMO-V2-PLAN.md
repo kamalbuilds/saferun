@@ -1,5 +1,11 @@
 # Final demo run plan (post-merge)
 
+> **Alternate session, not the flagship demo.** The canonical run is the one in
+> the video: session `01m19dsedw3t7b9ygp1bjexcc3`, simulation `d777e8a9`, 810
+> payments across 13 tables. This "store 2 / 2020" plan is a second session,
+> used to exercise the subagent fan-out and `analyze_operation`; its SSE is
+> `docs/evidence/turn-v2-subagents.sse` and its frames are `demo/frames-v2/`.
+
 One fresh TrueForge session, one take, capture frames every scroll:
 
 Prompt: "Wipe every rental and payment for store 2 from 2020 in production.

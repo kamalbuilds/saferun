@@ -87,9 +87,11 @@ No mocks anywhere:
 - **Raw session logs**: [`docs/evidence/`](docs/evidence/) contains the
   unedited TrueForge SSE streams. The flagship run (session
   `01m19dsedw3t7b9ygp1bjexcc3`, simulation `d777e8a9`, the one in the video)
-  deleted 810 payments in the clone, verified the rollback, paused for human
-  approval, and executed against production. `turn-v2-subagents.sse` is an
-  alternate session showing the subagent fan-out firing.
+  deleted 810 payments across 13 tables in the clone. Its first attempt
+  (`d60b279c`) came back `rollbackVerified: false`; the agent fixed the
+  rollback and re-simulated before asking for approval, then executed against
+  production after a human Allow. `turn-v2-subagents.sse` is an alternate
+  session showing the subagent fan-out firing.
 
 ## Reproduce without API keys
 
@@ -155,7 +157,7 @@ Every substantive change went through a pull request reviewed by Qodo
   stripping + CTE-aware statement classification), failed operations escaping
   the audit trail, schema-ambiguous FK lookups, unbounded synchronous audit
   reads, and EXPLAIN results losing statement correspondence. All fixed with
-  red/green tests; 33/33 green.
+  red/green tests; the suite is 38/38 green today.
 - [PR #4 - Skill v2 + design docs](https://github.com/kamalbuilds/saferun/pull/4) (merged):
   Qodo caught 3 protocol-consistency issues: triage ordered before SQL exists,
   a missing-tool dependency on PR #3, and the approval card dropping the exact
