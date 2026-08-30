@@ -125,6 +125,11 @@ Every substantive change went through a pull request reviewed by Qodo
 The PR threads show the full trail: initial review, fixes, dismissal
 rationale, and follow-up reviews against the final code.
 
+## Design docs
+
+- [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) -- two-layer safety boundary, clone-verify-execute lifecycle, and where subagents, GenUI, and ask-user fit.
+- [docs/THREAT-MODEL.md](docs/THREAT-MODEL.md) -- what SafeRun stops and what it does not.
+
 ## Built during the Agent Harness Hackathon
 
 August 24–30, 2026 · WeMakeDevs × TrueFoundry × Qodo.
