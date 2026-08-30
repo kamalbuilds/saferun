@@ -3,3 +3,4 @@ dist/
 .pgdata/
 *.log
 demo/frames/f*.png
+mcp-server/audit.log
