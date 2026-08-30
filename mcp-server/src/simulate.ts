@@ -10,10 +10,16 @@ import {
 } from "./db.js";
 
 export interface ExplainNode {
-  /** Estimated total cost from EXPLAIN (FORMAT JSON). */
-  totalCost: number;
-  /** Raw top-level Plan node from Postgres EXPLAIN JSON. */
-  plan: unknown;
+  /** Zero-based index of this statement in the operation SQL. */
+  statementIndex: number;
+  /** First 80 characters of the source SQL for this statement. */
+  sqlSnippet: string;
+  /** Estimated total cost from EXPLAIN (FORMAT JSON). Absent on error. */
+  totalCost?: number;
+  /** Raw top-level Plan node from Postgres EXPLAIN JSON. Absent on error. */
+  plan?: unknown;
+  /** Set when EXPLAIN could not be run for this statement (e.g. DDL). */
+  explainError?: string;
 }
 
 export interface SimulationResult {
@@ -78,15 +84,16 @@ async function captureExplainCosts(
   const clone = poolFor(cfg, cloneDb);
   const results: ExplainNode[] = [];
 
-  // Split on semicolons naively — same approach as the simple statement scanner
   const stmts = sql
     .split(";")
     .map((s) => s.trim())
     .filter(Boolean);
 
-  for (const stmt of stmts) {
-    // Each EXPLAIN runs in its own short-lived transaction so SAVEPOINT/DDL
-    // doesn't interfere and BEGIN is always available.
+  for (let statementIndex = 0; statementIndex < stmts.length; statementIndex++) {
+    const stmt = stmts[statementIndex];
+    const sqlSnippet = stmt.slice(0, 80);
+    // Each EXPLAIN runs in its own short-lived transaction so BEGIN is always
+    // available and a DDL failure doesn't taint subsequent statements.
     const client = await clone.connect();
     try {
       await client.query("BEGIN");
@@ -96,10 +103,11 @@ async function captureExplainCosts(
       const planNode = Array.isArray(plan) ? (plan[0] as Record<string, unknown>) : {};
       const innerPlan = (planNode["Plan"] as Record<string, unknown> | undefined) ?? {};
       const totalCost = Number(innerPlan["Total Cost"] ?? 0);
-      results.push({ totalCost, plan: planNode });
-    } catch {
-      // EXPLAIN failed (e.g. DDL CREATE TABLE) — skip this statement
+      results.push({ statementIndex, sqlSnippet, totalCost, plan: planNode });
+    } catch (err) {
+      // EXPLAIN failed (e.g. DDL CREATE TABLE) — record the error, don't drop
       await client.query("ROLLBACK").catch(() => {});
+      results.push({ statementIndex, sqlSnippet, explainError: String(err) });
     } finally {
       client.release();
     }
@@ -193,6 +201,16 @@ export async function simulateOperation(
     }
   } finally {
     await closePool(cloneDb);
+    // Terminate any remaining connections (e.g. from a failed EXPLAIN) so the
+    // DROP DATABASE doesn't get "other sessions are using the database".
+    await admin
+      .query(
+        `SELECT pg_terminate_backend(pid)
+         FROM pg_stat_activity
+         WHERE datname = $1 AND pid <> pg_backend_pid()`,
+        [cloneDb],
+      )
+      .catch(() => {});
     await admin.query(`DROP DATABASE IF EXISTS ${quoteIdent(cloneDb)}`).catch(() => {
       /* clone cleanup is best-effort; leftover clones are harmless */
     });
