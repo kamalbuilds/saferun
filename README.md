@@ -112,6 +112,18 @@ Every substantive change went through a pull request reviewed by Qodo
   database that still passed the loose fixture checks. Fixed by creating the
   role the dump references, importing with ON_ERROR_STOP=1, and asserting the
   exact expected row count (16,049). Follow-up review: 0 bugs.
+- [PR #3 - Risk analyzer, EXPLAIN costs, audit log](https://github.com/kamalbuilds/saferun/pull/3) (merged):
+  Qodo found 7 real bugs including a security issue: the audit tool leaked full
+  rollback SQL to any MCP session (fixed: sha256 + length only), CTE and
+  comment tricks that bypassed the bare-DELETE detector (fixed: comment
+  stripping + CTE-aware statement classification), failed operations escaping
+  the audit trail, schema-ambiguous FK lookups, unbounded synchronous audit
+  reads, and EXPLAIN results losing statement correspondence. All fixed with
+  red/green tests; 33/33 green.
+- [PR #4 - Skill v2 + design docs](https://github.com/kamalbuilds/saferun/pull/4) (merged):
+  Qodo caught 3 protocol-consistency issues: triage ordered before SQL exists,
+  a missing-tool dependency on PR #3, and the approval card dropping the exact
+  SQL requirement. All fixed.
 - [PR #2 - README, config scripts, demo assets](https://github.com/kamalbuilds/saferun/pull/2) (merged):
   Qodo surfaced 5 findings across two review rounds: API keys interpolated
   into curl argv (fixed: secrets piped via stdin), setup hard-coded to the
