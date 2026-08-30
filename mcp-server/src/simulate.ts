@@ -34,6 +34,25 @@ export function getSimulation(id: string): SimulationResult | undefined {
 }
 
 /**
+ * The production execution gate. Returns a refusal reason, or null when the
+ * simulation proves the operation is safe to execute (operation succeeded in
+ * the clone AND the rollback was verified to restore row content).
+ * This is the security boundary: prompts cannot bypass it.
+ */
+export function refusalReason(sim: SimulationResult | undefined, id: string): string | null {
+  if (!sim) {
+    return `REFUSED: no simulation with id ${id}. Run simulate_operation first.`;
+  }
+  if (!sim.operationOk) {
+    return `REFUSED: operation failed in sandbox: ${sim.operationError}`;
+  }
+  if (!sim.rollbackVerified) {
+    return `REFUSED: rollback was NOT verified in the sandbox. Residue: ${JSON.stringify(sim.rollbackResidue)}. Fix the rollback and re-simulate.`;
+  }
+  return null;
+}
+
+/**
  * Clone the production database (CREATE DATABASE ... TEMPLATE), execute the
  * destructive operation inside the clone, measure real impact, then execute
  * the proposed rollback in the same clone and verify it restores every table

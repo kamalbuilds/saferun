@@ -1,0 +1,60 @@
+name: tests
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:17
+        env:
+          POSTGRES_USER: saferun
+          POSTGRES_PASSWORD: saferun
+          POSTGRES_DB: pagila
+        ports: ["5544:5432"]
+        options: >-
+          --health-cmd "pg_isready -U saferun"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    env:
+      SAFERUN_PG_HOST: 127.0.0.1
+      SAFERUN_PG_PORT: "5544"
+      SAFERUN_PG_USER: saferun
+      SAFERUN_PG_PROD_DB: pagila
+      PGPASSWORD: saferun
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: mcp-server/package-lock.json
+
+      - name: Seed Pagila dataset
+        run: |
+          curl -sL -o /tmp/pagila-schema.sql https://raw.githubusercontent.com/devrimgunduz/pagila/v2.1.0/pagila-schema.sql
+          curl -sL -o /tmp/pagila-data.sql https://raw.githubusercontent.com/devrimgunduz/pagila/v2.1.0/pagila-data.sql
+          # Pagila dumps reference a 'postgres' owner role; create it so the
+          # import can run with ON_ERROR_STOP=1 (fail fast on any SQL error).
+          psql -h 127.0.0.1 -p 5544 -U saferun -d postgres -c "CREATE ROLE postgres"
+          psql -v ON_ERROR_STOP=1 -h 127.0.0.1 -p 5544 -U saferun -d pagila -q -f /tmp/pagila-schema.sql
+          psql -v ON_ERROR_STOP=1 -h 127.0.0.1 -p 5544 -U saferun -d pagila -q -f /tmp/pagila-data.sql
+          # Fixture sanity: exact expected row count, not merely nonempty.
+          test "$(psql -h 127.0.0.1 -p 5544 -U saferun -d pagila -Atc 'SELECT count(*) FROM payment')" = "16049"
+
+      - name: Install
+        working-directory: mcp-server
+        run: npm ci
+
+      - name: Typecheck
+        working-directory: mcp-server
+        run: npm run typecheck
+
+      - name: Tests (live database)
+        working-directory: mcp-server
+        run: npm test
