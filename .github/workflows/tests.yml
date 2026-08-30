@@ -39,9 +39,13 @@ jobs:
         run: |
           curl -sL -o /tmp/pagila-schema.sql https://raw.githubusercontent.com/devrimgunduz/pagila/v2.1.0/pagila-schema.sql
           curl -sL -o /tmp/pagila-data.sql https://raw.githubusercontent.com/devrimgunduz/pagila/v2.1.0/pagila-data.sql
-          psql -h 127.0.0.1 -p 5544 -U saferun -d pagila -q -f /tmp/pagila-schema.sql
-          psql -h 127.0.0.1 -p 5544 -U saferun -d pagila -q -f /tmp/pagila-data.sql
-          psql -h 127.0.0.1 -p 5544 -U saferun -d pagila -tc "SELECT count(*) FROM payment"
+          # Pagila dumps reference a 'postgres' owner role; create it so the
+          # import can run with ON_ERROR_STOP=1 (fail fast on any SQL error).
+          psql -h 127.0.0.1 -p 5544 -U saferun -d postgres -c "CREATE ROLE postgres"
+          psql -v ON_ERROR_STOP=1 -h 127.0.0.1 -p 5544 -U saferun -d pagila -q -f /tmp/pagila-schema.sql
+          psql -v ON_ERROR_STOP=1 -h 127.0.0.1 -p 5544 -U saferun -d pagila -q -f /tmp/pagila-data.sql
+          # Fixture sanity: exact expected row count, not merely nonempty.
+          test "$(psql -h 127.0.0.1 -p 5544 -U saferun -d pagila -Atc 'SELECT count(*) FROM payment')" = "16049"
 
       - name: Install
         working-directory: mcp-server
