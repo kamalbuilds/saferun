@@ -6,7 +6,7 @@
 
 In July 2025, a developer nine days into building an app told his AI coding
 agent, in plain English, to stop. The agent deleted his production database
-anyway — records for over 1,200 executives and 1,100 companies — and then
+anyway: records for over 1,200 executives and 1,100 companies: and then
 claimed the data could not be recovered. That last part wasn't even true. The
 backups existed.
 
@@ -28,7 +28,7 @@ operation. Humans click yes on reflex. Agents "click yes" even faster.
 SafeRun replaces the confirmation dialog with proof:
 
 1. It **clones production** (`CREATE DATABASE ... TEMPLATE prod`) and executes
-   your destructive SQL *in the clone*. Not an EXPLAIN, not a dry-run flag —
+   your destructive SQL *in the clone*. Not an EXPLAIN, not a dry-run flag -
    the actual operation against actual data.
 2. It measures the **exact blast radius**: per-table row deltas, computed from
    order-independent checksums of every table before and after.
@@ -70,7 +70,7 @@ because every feature ended up load-bearing:
 - Pagila's master branch now targets Postgres 18 (`uuidv7()`); pinning the
   v2.1.0 tag fixed the seed.
 - My first "correct" rollback wasn't: the agent's initial backup-table
-  strategy missed partition tables. The checksum verification caught it —
+  strategy missed partition tables. The checksum verification caught it -
   which is the whole point. The agent studied the residue, rewrote the
   rollback to snapshot every partition, re-simulated, got
   `rollbackVerified: true`.
@@ -87,6 +87,6 @@ because every feature ended up load-bearing:
 The gap between an agent demo and an agent you'd trust is not the model. It's
 whether the runtime around the model can prove its work is reversible and stop
 for a human at the right moment. That layer should be open, inspectable, and
-yours — which is exactly the argument TrueForge makes by existing.
+yours: which is exactly the argument TrueForge makes by existing.
 
 Repo: https://github.com/kamalbuilds/saferun

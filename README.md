@@ -9,13 +9,13 @@ the data was unrecoverable. Nothing stood between the model and the data.
 SafeRun is that missing layer, built as a [TrueForge](https://github.com/truefoundry/trueforge)
 agent. It refuses to run any destructive database operation until it has:
 
-1. **Measured the exact blast radius** — by executing the operation in an
+1. **Measured the exact blast radius**: by executing the operation in an
    isolated clone of production, not by guessing from the SQL.
-2. **Proven the undo works** — it writes the rollback, executes it in the same
+2. **Proven the undo works**: it writes the rollback, executes it in the same
    clone, and verifies every table checksum returns to the pre-operation
    state. Not "are you sure?" but *"I already tested your undo. It works.
    Here is the proof."*
-3. **Received explicit human approval** — through TrueForge's native approval
+3. **Received explicit human approval**: through TrueForge's native approval
    gate. The execute tool is hard-wired to refuse unverified simulations, so
    even a jailbroken model cannot skip the protocol.
 
@@ -41,7 +41,7 @@ The agent runs on the TrueForge harness and uses, non-decoratively:
 | Harness feature | How SafeRun uses it |
 |---|---|
 | **MCP tools** | `saferun-db` MCP server: `inspect_database`, `run_readonly_query`, `simulate_operation`, `execute_approved_operation` |
-| **Skills** | `dangerous-ops` SKILL.md — the git-backed safety protocol the agent loads for any destructive request |
+| **Skills** | `dangerous-ops` SKILL.md: the git-backed safety protocol the agent loads for any destructive request |
 | **Sandbox** | Daytona sandbox for staging SQL files and analysis; the DB clone is the data sandbox |
 | **Human approvals** | `execute_approved_operation` is on TrueForge's approval list; the run pauses with `tool.approval_required` until a human allows it |
 | **Ask-user questions** | The agent surfaces scope ambiguity ("what does *inactive* mean?") before simulating |
@@ -61,14 +61,14 @@ model cannot bypass it, and TrueForge's approval gate sits on top of that.
 No mocks anywhere:
 
 - **Real database**: Postgres 17 with the [Pagila](https://github.com/devrimgunduz/pagila)
-  dataset — 599 customers, 16,049 payments, 16,044 rentals, partitioned tables,
+  dataset: 599 customers, 16,049 payments, 16,044 rentals, partitioned tables,
   FK cascades.
 - **Real simulation**: `CREATE DATABASE ... TEMPLATE production`, real SQL
   execution, per-table row counts and order-independent MD5 checksums.
 - **Real proof**: the rollback is executed and the full database fingerprint
   compared byte-for-byte.
 - **Raw session logs**: [`docs/evidence/`](docs/evidence/) contains the
-  unedited TrueForge SSE streams of the demo run — 810 payments deleted in
+  unedited TrueForge SSE streams of the demo run: 810 payments deleted in
   the clone, rollback verified, human approval, production execution.
 
 ## Run it
