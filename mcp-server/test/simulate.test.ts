@@ -1,13 +1,14 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 import {
+  closePool,
   diffFingerprints,
   fingerprintDatabase,
   loadConfig,
   poolFor,
   quoteIdent,
 } from "../src/db.js";
-import { getSimulation, simulateOperation } from "../src/simulate.js";
+import { getSimulation, refusalReason, simulateOperation } from "../src/simulate.js";
 
 // These tests run against the real local Postgres + Pagila dataset.
 // They never write to the production database: simulation happens in clones.
@@ -56,9 +57,19 @@ test("simulation with a broken rollback is NOT verified and execution is refused
   assert.equal(sim.rollbackVerified, false);
   assert.ok(sim.rollbackResidue.length > 0, "residue must name the damaged table");
   assert.ok(getSimulation(sim.simulationId), "simulation must be retrievable");
+  // the production gate must refuse this simulation
+  const refusal = refusalReason(getSimulation(sim.simulationId), sim.simulationId);
+  assert.match(refusal ?? "", /REFUSED: rollback was NOT verified/);
 });
 
-test("simulation with a correct rollback verifies byte-identical restore", async () => {
+test("refusalReason covers every gate branch", async () => {
+  assert.match(refusalReason(undefined, "nope") ?? "", /REFUSED: no simulation/);
+  const failed = await simulateOperation(cfg, "DELETE FROM does_not_exist;", "SELECT 1;");
+  assert.equal(failed.operationOk, false);
+  assert.match(refusalReason(failed, failed.simulationId) ?? "", /REFUSED: operation failed/);
+});
+
+test("simulation with a correct rollback verifies row-content-identical restore", async () => {
   const good = await simulateOperation(
     cfg,
     `CREATE TABLE saferun_bak_fa AS SELECT * FROM film_actor WHERE actor_id <= 5;
@@ -70,6 +81,8 @@ test("simulation with a correct rollback verifies byte-identical restore", async
   assert.ok(good.totalRowsDeleted > 0);
   assert.equal(good.rollbackVerified, true, JSON.stringify(good.rollbackResidue));
   assert.equal(good.rollbackResidue.length, 0);
+  // the production gate must allow this simulation
+  assert.equal(refusalReason(good, good.simulationId), null);
 });
 
 test("simulation never mutates the production database", async () => {
@@ -85,4 +98,10 @@ test("cleanup: no leftover simulation clones", async () => {
     "SELECT datname FROM pg_database WHERE datname LIKE 'saferun_sim_%'",
   );
   assert.equal(res.rows.length, 0, `leftover clones: ${JSON.stringify(res.rows)}`);
+});
+
+test.after(async () => {
+  for (const db of ["postgres", cfg.productionDb]) {
+    await closePool(db);
+  }
 });
