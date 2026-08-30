@@ -36,5 +36,7 @@ unverified simulations: the safety is not in the prompt, a jailbroken model
 cannot bypass it. Show 7/7 tests green (red path + green path + prod isolation).
 
 ## Scene 6: Close (2:50–3:00)
-"MCP tools, skills, sandbox, approvals, ask-user, persistent sessions -
-every harness feature load-bearing. SafeRun: agents you can hand the keys to."
+"MCP tools, skills, sandbox, approvals, ask-user, persistent sessions, subagents -
+five harness features load-bearing in the flagship run; subagents fire in the
+alternate store-2 session. GenUI is the enabled rendering path; the free-tier
+model rendered it as a markdown table. SafeRun: agents you can hand the keys to."
