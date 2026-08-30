@@ -103,7 +103,27 @@ production isolation (simulation never mutates production).
 
 ## Qodo Code Review Evidence
 
-<!-- filled after review cycle -->
+Every substantive change went through a pull request reviewed by Qodo
+(qodo-code-review app), with follow-up reviews after each fix:
+
+- [PR #1 - Verification test suite + CI](https://github.com/kamalbuilds/saferun/pull/1) (merged):
+  Qodo found a real reliability bug: the CI Pagila seed ran psql without
+  ON_ERROR_STOP, so SQL errors could silently produce a partially seeded
+  database that still passed the loose fixture checks. Fixed by creating the
+  role the dump references, importing with ON_ERROR_STOP=1, and asserting the
+  exact expected row count (16,049). Follow-up review: 0 bugs.
+- [PR #2 - README, config scripts, demo assets](https://github.com/kamalbuilds/saferun/pull/2) (merged):
+  Qodo surfaced 5 findings across two review rounds: API keys interpolated
+  into curl argv (fixed: secrets piped via stdin), setup hard-coded to the
+  Apple Silicon Homebrew path (fixed: PATH discovery + fallbacks), accepted
+  any PostgreSQL version (fixed: initdb --version must report 17.x),
+  undeclared jq dependency (fixed: explicit check with clear error), and a
+  cross-PR "tests do not exist" finding dismissed with reason in the thread
+  once PR #1 merged the suite. All fixes verified by a follow-up review with
+  the findings struck through.
+
+The PR threads show the full trail: initial review, fixes, dismissal
+rationale, and follow-up reviews against the final code.
 
 ## Built during the Agent Harness Hackathon
 
