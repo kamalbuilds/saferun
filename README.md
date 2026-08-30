@@ -66,7 +66,7 @@ No mocks anywhere:
 - **Real simulation**: `CREATE DATABASE ... TEMPLATE production`, real SQL
   execution, per-table row counts and order-independent MD5 checksums.
 - **Real proof**: the rollback is executed and the full database fingerprint
-  compared byte-for-byte.
+  compared per table: exact row counts plus order-independent content checksums.
 - **Raw session logs**: [`docs/evidence/`](docs/evidence/) contains the
   unedited TrueForge SSE streams of the demo run: 810 payments deleted in
   the clone, rollback verified, human approval, production execution.
@@ -98,7 +98,7 @@ cd mcp-server && npm test
 ```
 
 Seven tests against the live database, covering the red path (broken rollback
-→ execution refused), the green path (verified byte-identical restore), and
+→ execution refused), the green path (verified row-content-identical restore), and
 production isolation (simulation never mutates production).
 
 ## Qodo Code Review Evidence

@@ -33,7 +33,7 @@ SafeRun replaces the confirmation dialog with proof:
 2. It measures the **exact blast radius**: per-table row deltas, computed from
    order-independent checksums of every table before and after.
 3. It writes the **rollback**, executes *that* in the clone too, and verifies
-   every table checksum returns to the pre-operation state. Byte-identical.
+   every table checksum returns to the pre-operation state. Row-content identical, per-table.
 4. Only then does it come back to you: *"810 payments across 6 partitioned
    tables will be deleted. I already executed your undo in a clone. Every
    checksum restored. Approve?"*
