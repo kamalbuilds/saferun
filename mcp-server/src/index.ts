@@ -1,20 +1,15 @@
-import { createHash } from "node:crypto";
 import { randomUUID } from "node:crypto";
 import express from "express";
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { StreamableHTTPServerTransport } from "@modelcontextprotocol/sdk/server/streamableHttp.js";
 import { z } from "zod";
 import { fingerprintDatabase, loadConfig, poolFor } from "./db.js";
-import { getSimulation, refusalReason, simulateOperation } from "./simulate.js";
+import { simulateOperation } from "./simulate.js";
 import { analyzeOperation } from "./analyze.js";
+import { executeApprovedOperation } from "./execute.js";
 import { appendAuditEvent, readAuditLog } from "./audit.js";
 
 const cfg = loadConfig();
-
-/** sha256 hex of a string — used to redact SQL bodies in audit events (fix #5). */
-function sha256(s: string): string {
-  return createHash("sha256").update(s).digest("hex");
-}
 
 function buildServer(): McpServer {
   const server = new McpServer({ name: "saferun", version: "0.3.0" });
@@ -159,53 +154,43 @@ function buildServer(): McpServer {
     {
       title: "Execute operation on PRODUCTION",
       description:
-        "Execute a previously simulated operation against the real production database. Refuses to run unless the simulation exists, the operation succeeded in the sandbox, and the rollback was VERIFIED to restore the data. This is the only tool that writes to production.",
+        "Execute a previously simulated operation against the real production database. Refuses to run unless the simulation exists, the operation succeeded in the sandbox, the rollback was VERIFIED to restore the data, the static risk grade is not F (unless override_grade_f is passed), and the tables the simulation impacted have not drifted in production since the simulation ran. This is the only tool that writes to production.",
       annotations: { destructiveHint: true, readOnlyHint: false },
       inputSchema: {
         simulation_id: z
           .string()
           .describe("Simulation id returned by simulate_operation"),
+        override_grade_f: z
+          .boolean()
+          .optional()
+          .describe(
+            "Explicitly accept an operation the static analyzer graded F (highest risk). Defaults to false; the override is recorded in the audit log.",
+          ),
       },
     },
     // Fix #3: audit failures; fix #5: redact rollback SQL body
-    async ({ simulation_id }) => {
-      const sim = getSimulation(simulation_id);
-      const refusal = refusalReason(sim, simulation_id);
-      if (refusal) {
-        appendAuditEvent("refusal", {
-          simulation_id,
-          reason: refusal,
-          status: "refused",
-        });
-        return {
-          content: [{ type: "text", text: refusal }],
-          isError: true,
-        };
-      }
+    // S5/S6: grade-F and drift gates live in executeApprovedOperation (code-level)
+    async ({ simulation_id, override_grade_f }) => {
       try {
-        const pool = poolFor(cfg, cfg.productionDb);
-        const before = await fingerprintDatabase(cfg, cfg.productionDb);
-        await pool.query(sim!.operation);
-        const after = await fingerprintDatabase(cfg, cfg.productionDb);
-        const changed = after.filter(
-          (a) => before.find((b) => b.table === a.table)?.checksum !== a.checksum,
-        );
-        const payload = {
-          executed: true,
-          database: cfg.productionDb,
-          simulationId: simulation_id,
-          tablesChanged: changed.map((c) => c.table),
-          // Fix #5: redact full rollback SQL — expose sha256 + length only
-          rollbackSha256: sha256(sim!.rollback),
-          rollbackLength: sim!.rollback.length,
-        };
-        appendAuditEvent("execute", { ...payload, status: "ok" });
+        const outcome = await executeApprovedOperation(cfg, simulation_id, {
+          overrideGradeF: override_grade_f === true,
+        });
+        if (outcome.refusal) {
+          appendAuditEvent("refusal", {
+            simulation_id,
+            reason: outcome.refusal,
+            grade: outcome.grade,
+            status: "refused",
+          });
+          return {
+            content: [{ type: "text", text: outcome.refusal }],
+            isError: true,
+          };
+        }
+        appendAuditEvent("execute", { ...outcome.payload, status: "ok" });
         return {
           content: [
-            {
-              type: "text",
-              text: JSON.stringify(payload, null, 2),
-            },
+            { type: "text", text: JSON.stringify(outcome.payload, null, 2) },
           ],
         };
       } catch (err) {

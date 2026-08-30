@@ -80,6 +80,10 @@ Automated path:
 - If `grade` is **F**: inform the user, quote all `riskFactors`, and STOP.
   Only continue if the human replies with an explicit override
   ("proceed despite grade F"). Log the override in your reply.
+  `execute_approved_operation` enforces this in code as well: it re-runs the
+  analyzer on the stored simulation and refuses a grade-F operation unless you
+  pass `override_grade_f: true`. Only pass that argument when the human has
+  explicitly overridden, and say so in your reply.
 - Grades A-D: note the grade and risk factors, then continue with Step 5.
 
 ### Step 5 -- Simulate in the sandbox clone
@@ -114,8 +118,13 @@ Then ask: **"Approve execution of simulation `<id>`? Reply YES or NO."**
 ### Step 7 -- Execute only after explicit approval (separate turn)
 
 - On explicit "yes" or "approved", call `execute_approved_operation` with the
-  simulation id.
+  simulation id. Add `override_grade_f: true` only when Step 4 graded the
+  operation F **and** the human explicitly overrode it.
 - On any other reply, treat as NO and do not execute.
+- If the tool returns `REFUSED: production drifted since simulation <id>`,
+  production changed under one of the impacted tables after the simulation ran.
+  The verified rollback no longer describes the live data. Do not retry: go
+  back to Step 5, re-simulate, and re-present the card with fresh numbers.
 - Report what changed in production and remind the user the verified rollback
   SQL is on file if they need to undo.
 
