@@ -8,7 +8,7 @@ if [ -z "${PG17:-}" ]; then
               /opt/homebrew/opt/postgresql@17/bin \
               /usr/local/opt/postgresql@17/bin \
               /usr/lib/postgresql/17/bin; do
-    if [ -n "$cand" ] && [ -x "$cand/initdb" ]; then PG17="$cand"; break; fi
+    if [ -n "$cand" ] && [ -x "$cand/initdb" ] && "$cand/initdb" --version 2>/dev/null | grep -q " 17\."; then PG17="$cand"; break; fi
   done
 fi
 if [ -z "${PG17:-}" ] || [ ! -x "$PG17/initdb" ]; then

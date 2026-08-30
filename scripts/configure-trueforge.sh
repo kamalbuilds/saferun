@@ -4,6 +4,7 @@
 set -euo pipefail
 
 TF=${TF:-http://localhost:8790}
+command -v jq >/dev/null || { echo "jq is required (brew install jq / apt install jq)" >&2; exit 1; }
 
 echo "== model provider (OpenRouter, free tool-calling model)"
 # Secrets are piped via stdin (--data @-), never exposed in argv.
