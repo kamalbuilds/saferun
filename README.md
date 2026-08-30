@@ -2,7 +2,7 @@
 
 **The agent that would have stopped the Replit database wipe.**
 
-**[Watch the 113-second demo](https://files.catbox.moe/x308e9.mp4)** — investigation, verified rollback, human approval, production execution.
+**[Watch the 106-second demo](https://files.catbox.moe/8v0gsl.mp4)** — investigation, verified rollback, human approval, production execution.
 
 In July 2025 an AI coding agent deleted a production database holding records
 for 1,200+ executives, ignored an explicit instruction to stop, then claimed

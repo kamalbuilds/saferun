@@ -12,7 +12,7 @@ row, and only touches production after TrueForge's human approval gate.
 https://github.com/kamalbuilds/saferun
 
 ## Demo video
-https://files.catbox.moe/x308e9.mp4 (113s; also `demo/saferun-demo.mp4` in the repo)
+https://files.catbox.moe/8v0gsl.mp4 (106s, burned-in captions; also `demo/saferun-demo.mp4` in the repo)
 
 ## What it does / how it uses TrueForge (short write-up)
 SafeRun is a database guardian agent built on TrueForge. Give it any

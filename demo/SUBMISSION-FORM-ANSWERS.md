@@ -7,7 +7,7 @@ DEPLOYED LINK:
 (leave blank - runs locally against your own Postgres by design)
 
 YOUTUBE VIDEO:
-<paste after upload; file is demo/saferun-demo.mp4, mirror https://files.catbox.moe/x308e9.mp4>
+<paste after upload; file is demo/saferun-demo.mp4, mirror https://files.catbox.moe/8v0gsl.mp4>
 
 WHAT DOES YOUR PROJECT DO?
 SafeRun is a database guardian agent. In July 2025 an AI coding agent deleted a

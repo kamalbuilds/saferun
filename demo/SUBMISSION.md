@@ -48,5 +48,5 @@ Daytona sandboxes, raw SSE session logs committed under docs/evidence/.
 ## Links
 
 - Repo: https://github.com/kamalbuilds/saferun
-- Demo video: https://files.catbox.moe/x308e9.mp4 (also demo/saferun-demo.mp4 in the repo)
+- Demo video: https://files.catbox.moe/8v0gsl.mp4 (also demo/saferun-demo.mp4 in the repo)
 - Qodo evidence: README section + PR history
