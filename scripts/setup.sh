@@ -2,7 +2,19 @@
 # SafeRun local setup: real Postgres 17 + Pagila dataset + MCP server + TrueForge wiring.
 set -euo pipefail
 
-PG17=${PG17:-/opt/homebrew/opt/postgresql@17/bin}
+# Locate PostgreSQL 17 binaries: PATH first, common Homebrew/Linux paths as fallback.
+if [ -z "${PG17:-}" ]; then
+  for cand in "$(dirname "$(command -v initdb 2>/dev/null)" 2>/dev/null)" \
+              /opt/homebrew/opt/postgresql@17/bin \
+              /usr/local/opt/postgresql@17/bin \
+              /usr/lib/postgresql/17/bin; do
+    if [ -n "$cand" ] && [ -x "$cand/initdb" ] && "$cand/initdb" --version 2>/dev/null | grep -q " 17\."; then PG17="$cand"; break; fi
+  done
+fi
+if [ -z "${PG17:-}" ] || [ ! -x "$PG17/initdb" ]; then
+  echo "PostgreSQL 17 binaries not found. Install postgresql@17 or set PG17=/path/to/pg17/bin" >&2
+  exit 1
+fi
 PGDATA=${PGDATA:-$PWD/.pgdata}
 PORT=${SAFERUN_PG_PORT:-5544}
 
