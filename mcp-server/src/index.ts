@@ -5,11 +5,13 @@ import { StreamableHTTPServerTransport } from "@modelcontextprotocol/sdk/server/
 import { z } from "zod";
 import { fingerprintDatabase, loadConfig, poolFor } from "./db.js";
 import { getSimulation, refusalReason, simulateOperation } from "./simulate.js";
+import { analyzeOperation } from "./analyze.js";
+import { appendAuditEvent, readAuditLog } from "./audit.js";
 
 const cfg = loadConfig();
 
 function buildServer(): McpServer {
-  const server = new McpServer({ name: "saferun", version: "0.1.0" });
+  const server = new McpServer({ name: "saferun", version: "0.2.0" });
 
   server.registerTool(
     "inspect_database",
@@ -70,11 +72,43 @@ function buildServer(): McpServer {
   );
 
   server.registerTool(
+    "analyze_operation",
+    {
+      title: "Static risk analysis of SQL",
+      description:
+        "Without executing anything, return a static risk report for a SQL string: statement types, tables referenced, whether a WHERE clause is present per statement (bare DELETE/UPDATE = critical), FK relationships of touched tables (queried from information_schema in a read-only transaction), and an overall risk grade A–F. Use this before simulate_operation to understand what an operation touches.",
+      annotations: { readOnlyHint: true },
+      inputSchema: {
+        sql: z.string().describe("The SQL to analyse (one or more statements)"),
+      },
+    },
+    async ({ sql }) => {
+      try {
+        const report = await analyzeOperation(cfg, sql);
+        appendAuditEvent("analyze", {
+          grade: report.grade,
+          touchedTables: report.touchedTables,
+          riskFactors: report.riskFactors,
+          statementCount: report.statements.length,
+        });
+        return {
+          content: [{ type: "text", text: JSON.stringify(report, null, 2) }],
+        };
+      } catch (err) {
+        return {
+          content: [{ type: "text", text: `Analysis failed: ${String(err)}` }],
+          isError: true,
+        };
+      }
+    },
+  );
+
+  server.registerTool(
     "simulate_operation",
     {
       title: "Simulate destructive operation with verified rollback",
       description:
-        "Clone the production database, execute the destructive SQL inside the clone, measure the exact blast radius (rows deleted/changed per table), then execute the proposed rollback SQL in the clone and verify it restores every table checksum. Never touches production. Returns a simulation id required by execute_approved_operation.",
+        "Clone the production database, execute the destructive SQL inside the clone, measure the exact blast radius (rows deleted/changed per table), then execute the proposed rollback SQL in the clone and verify it restores every table checksum. Never touches production. Returns a simulation id required by execute_approved_operation. Includes wall-clock durations and EXPLAIN cost estimates.",
       annotations: { readOnlyHint: true },
       inputSchema: {
         operation: z.string().describe("The destructive SQL to test"),
@@ -85,6 +119,16 @@ function buildServer(): McpServer {
     },
     async ({ operation, rollback }) => {
       const result = await simulateOperation(cfg, operation, rollback);
+      appendAuditEvent("simulate", {
+        simulationId: result.simulationId,
+        operationOk: result.operationOk,
+        rollbackVerified: result.rollbackVerified,
+        tablesChanged: result.tablesChanged,
+        totalRowsDeleted: result.totalRowsDeleted,
+        operationDurationMs: result.operationDurationMs,
+        rollbackDurationMs: result.rollbackDurationMs,
+        operationError: result.operationError,
+      });
       return {
         content: [{ type: "text", text: JSON.stringify(result, null, 2) }],
       };
@@ -108,6 +152,10 @@ function buildServer(): McpServer {
       const sim = getSimulation(simulation_id);
       const refusal = refusalReason(sim, simulation_id);
       if (refusal) {
+        appendAuditEvent("refusal", {
+          simulation_id,
+          reason: refusal,
+        });
         return {
           content: [{ type: "text", text: refusal }],
           isError: true,
@@ -120,21 +168,51 @@ function buildServer(): McpServer {
       const changed = after.filter(
         (a) => before.find((b) => b.table === a.table)?.checksum !== a.checksum,
       );
+      const payload = {
+        executed: true,
+        database: cfg.productionDb,
+        simulationId: simulation_id,
+        tablesChanged: changed.map((c) => c.table),
+        verifiedRollbackOnFile: sim!.rollback,
+      };
+      appendAuditEvent("execute", {
+        ...payload,
+      });
       return {
         content: [
           {
             type: "text",
-            text: JSON.stringify(
-              {
-                executed: true,
-                database: cfg.productionDb,
-                simulationId: simulation_id,
-                tablesChanged: changed.map((c) => c.table),
-                verifiedRollbackOnFile: sim!.rollback,
-              },
-              null,
-              2,
-            ),
+            text: JSON.stringify(payload, null, 2),
+          },
+        ],
+      };
+    },
+  );
+
+  server.registerTool(
+    "get_audit_log",
+    {
+      title: "Read audit log",
+      description:
+        "Return the last 50 SafeRun audit events (simulate, execute, refusal, analyze) from the append-only audit log. Read-only.",
+      annotations: { readOnlyHint: true },
+      inputSchema: {
+        limit: z
+          .number()
+          .int()
+          .min(1)
+          .max(200)
+          .optional()
+          .describe("Max entries to return (default 50, max 200)"),
+      },
+    },
+    async ({ limit }) => {
+      const entries = readAuditLog(limit ?? 50);
+      return {
+        content: [
+          {
+            type: "text",
+            text: JSON.stringify({ count: entries.length, entries }, null, 2),
           },
         ],
       };
