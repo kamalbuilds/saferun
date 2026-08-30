@@ -79,8 +79,11 @@ because every feature ended up load-bearing:
 
 Late in the day I asked a judge-simulation what would actually score, tore up
 my roadmap, and shipped the answer: a static risk analyzer (A-F grades,
-missing-WHERE detection, FK maps), per-table subagent fan-out, a generative UI
-blast-radius card, and an audit log. Qodo immediately caught the analyzer
+missing-WHERE detection, FK maps), per-table subagent fan-out (fired in the
+store-2 / 2020 alternate session in `turn-v2-subagents.sse`), Generative UI
+enabled as the blast-radius card rendering path (the flagship run rendered it
+as a markdown table under free-tier model limits), and an audit log. Qodo
+immediately caught the analyzer
 trusting first tokens (CTE and comment tricks bypassed the bare-DELETE
 penalty) and the audit tool leaking rollback SQL to any MCP session. Review
 in the loop, not at the end.
