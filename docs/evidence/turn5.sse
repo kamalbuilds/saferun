@@ -1,0 +1,42 @@
+data: {"type":"turn.created","id":"01m1933ybqkqw0118mbq4mdfhp","turn_id":"01m1933yapxdycmptxc94th1ca.local","previous_turn_id":"01m192xch1xgeq03rhk2mqcr9b.local","input":[{"type":"user.message","content":"Yes, approved. Execute simulation d777e8a9 against production."}],"state":{"status":"running"},"created_at":"2026-08-30T10:23:21.969Z","thread_id":null}
+id: 1
+
+data: {"type":"model.message","thread_id":"main","created_at":"2026-08-30T10:23:21.977Z","id":"01m1933ybs00qmc4r8mm1y1vne"}
+id: 2
+
+data: {"tool_calls":[{"index":0,"id":"call_01a0523205287f43bc9d76c9","type":"function","function":{"name":"call_tool","arguments":""},"tool_info":{"type":"truefoundry-system","name":"call_tool"}}],"type":"model.message.delta","id":"01m1933ybs00qmc4r8mm1y1vne","thread_id":"main","created_at":"2026-08-30T10:23:25.154Z"}
+id: 3
+
+data: {"tool_calls":[{"index":0,"function":{"arguments":""}}],"type":"model.message.delta","id":"01m1933ybs00qmc4r8mm1y1vne","thread_id":"main"}
+id: 4
+
+data: {"tool_calls":[{"index":0,"function":{"arguments":"{\"mcp_server\":\"saferun-db\",\"tool_name\":{\"input\":{\"simulation_id\":\"d777e8a9\"}}}"}}],"type":"model.message.delta","id":"01m1933ybs00qmc4r8mm1y1vne","thread_id":"main"}
+id: 5
+
+data: {"type":"model.message.delta","id":"01m1933ybs00qmc4r8mm1y1vne","thread_id":"main","finish_reason":"tool_calls","usage":{"input_tokens":19635,"output_tokens":75,"cache_read_tokens":18374,"input_tokens_breakdown":{"harness":3566,"skills":191,"instructions":167,"tool_definitions":0,"messages":15711}}}
+id: 6
+
+data: {"tool_call_id":"call_01a0523205287f43bc9d76c9","content":"{\"error\":[{\"type\":\"text\",\"text\":\"{\\\"error\\\":\\\"Validation failed\\\",\\\"details\\\":{\\\"errors\\\":[],\\\"properties\\\":{\\\"tool_name\\\":{\\\"errors\\\":[\\\"Invalid input: expected string, received object\\\"]}}}}\"}]}","type":"tool.response","id":"01m19341pwtpr752qed488ksr0","created_at":"2026-08-30T10:23:25.404Z","thread_id":"main"}
+id: 7
+
+data: {"type":"model.message","thread_id":"main","created_at":"2026-08-30T10:23:25.405Z","id":"01m19341pxdzy860tdbsf6je8q"}
+id: 8
+
+data: {"tool_calls":[{"index":0,"id":"call_01a0523210337d10a9f20757","type":"function","function":{"name":"call_tool","arguments":""},"tool_info":{"type":"truefoundry-system","name":"call_tool"}}],"type":"model.message.delta","id":"01m19341pxdzy860tdbsf6je8q","thread_id":"main","created_at":"2026-08-30T10:23:28.586Z"}
+id: 9
+
+data: {"tool_calls":[{"index":0,"function":{"arguments":""}}],"type":"model.message.delta","id":"01m19341pxdzy860tdbsf6je8q","thread_id":"main"}
+id: 10
+
+data: {"tool_calls":[{"index":0,"function":{"arguments":"{\"mcp_server\":\"saferun-db\",\"tool_name\":\"execute_approved_operation\",\"input\":{\"simulation_id\":\"d777e8a9\"}}"}}],"type":"model.message.delta","id":"01m19341pxdzy860tdbsf6je8q","thread_id":"main"}
+id: 11
+
+data: {"type":"model.message.delta","id":"01m19341pxdzy860tdbsf6je8q","thread_id":"main","finish_reason":"tool_calls","usage":{"input_tokens":19762,"output_tokens":69,"cache_read_tokens":19635,"input_tokens_breakdown":{"harness":3566,"skills":191,"instructions":167,"tool_definitions":0,"messages":15838}}}
+id: 12
+
+data: {"type":"tool.approval_required","id":"01m1934565nx6ets5stw8gvmgv","created_at":"2026-08-30T10:23:28.965Z","thread_id":"main","tool_calls":[{"id":"call_01a0523210337d10a9f20757","source_event_id":"01m19341pxdzy860tdbsf6je8q"}]}
+id: 13
+
+data: {"type":"turn.done","id":"01m193457ffvn2nzfs0y3gr2e0","created_at":"2026-08-30T10:23:29.007Z","state":{"status":"done","output":null,"required_actions":[{"type":"tool.approval_required","id":"01m1934565nx6ets5stw8gvmgv","created_at":"2026-08-30T10:23:28.965Z","thread_id":"main","tool_calls":[{"id":"call_01a0523210337d10a9f20757","source_event_id":"01m19341pxdzy860tdbsf6je8q"}]}],"completed_at":"2026-08-30T10:23:29.007Z","metrics":{"total_input_tokens":39397,"total_output_tokens":144,"total_tokens":39541,"total_cache_read_tokens":38009,"total_reasoning_tokens":0}},"thread_id":null}
+id: 14
+
