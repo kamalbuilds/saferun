@@ -1,3 +1,4 @@
+import { createHash } from "node:crypto";
 import { randomUUID } from "node:crypto";
 import express from "express";
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
@@ -10,8 +11,13 @@ import { appendAuditEvent, readAuditLog } from "./audit.js";
 
 const cfg = loadConfig();
 
+/** sha256 hex of a string — used to redact SQL bodies in audit events (fix #5). */
+function sha256(s: string): string {
+  return createHash("sha256").update(s).digest("hex");
+}
+
 function buildServer(): McpServer {
-  const server = new McpServer({ name: "saferun", version: "0.2.0" });
+  const server = new McpServer({ name: "saferun", version: "0.3.0" });
 
   server.registerTool(
     "inspect_database",
@@ -76,13 +82,14 @@ function buildServer(): McpServer {
     {
       title: "Static risk analysis of SQL",
       description:
-        "Without executing anything, return a static risk report for a SQL string: statement types, tables referenced, whether a WHERE clause is present per statement (bare DELETE/UPDATE = critical), FK relationships of touched tables (queried from information_schema in a read-only transaction), and an overall risk grade A–F. Use this before simulate_operation to understand what an operation touches.",
+        "Without executing anything, return a static risk report for a SQL string: statement types, tables referenced, whether a WHERE clause is present per statement (bare DELETE/UPDATE = critical), FK relationships of touched tables (queried from information_schema in a read-only transaction), and an overall risk grade A–F. CTEs and SQL comments are handled correctly.",
       annotations: { readOnlyHint: true },
       inputSchema: {
         sql: z.string().describe("The SQL to analyse (one or more statements)"),
       },
     },
     async ({ sql }) => {
+      // Fix #3: audit errors too, not just successes
       try {
         const report = await analyzeOperation(cfg, sql);
         appendAuditEvent("analyze", {
@@ -90,11 +97,13 @@ function buildServer(): McpServer {
           touchedTables: report.touchedTables,
           riskFactors: report.riskFactors,
           statementCount: report.statements.length,
+          status: "ok",
         });
         return {
           content: [{ type: "text", text: JSON.stringify(report, null, 2) }],
         };
       } catch (err) {
+        appendAuditEvent("analyze", { status: "error", error: String(err) });
         return {
           content: [{ type: "text", text: `Analysis failed: ${String(err)}` }],
           isError: true,
@@ -117,21 +126,31 @@ function buildServer(): McpServer {
           .describe("The rollback SQL that should undo the operation"),
       },
     },
+    // Fix #3: audit failures too
     async ({ operation, rollback }) => {
-      const result = await simulateOperation(cfg, operation, rollback);
-      appendAuditEvent("simulate", {
-        simulationId: result.simulationId,
-        operationOk: result.operationOk,
-        rollbackVerified: result.rollbackVerified,
-        tablesChanged: result.tablesChanged,
-        totalRowsDeleted: result.totalRowsDeleted,
-        operationDurationMs: result.operationDurationMs,
-        rollbackDurationMs: result.rollbackDurationMs,
-        operationError: result.operationError,
-      });
-      return {
-        content: [{ type: "text", text: JSON.stringify(result, null, 2) }],
-      };
+      try {
+        const result = await simulateOperation(cfg, operation, rollback);
+        appendAuditEvent("simulate", {
+          simulationId: result.simulationId,
+          operationOk: result.operationOk,
+          rollbackVerified: result.rollbackVerified,
+          tablesChanged: result.tablesChanged,
+          totalRowsDeleted: result.totalRowsDeleted,
+          operationDurationMs: result.operationDurationMs,
+          rollbackDurationMs: result.rollbackDurationMs,
+          operationError: result.operationError,
+          status: "ok",
+        });
+        return {
+          content: [{ type: "text", text: JSON.stringify(result, null, 2) }],
+        };
+      } catch (err) {
+        appendAuditEvent("simulate", { status: "error", error: String(err) });
+        return {
+          content: [{ type: "text", text: `Simulation failed: ${String(err)}` }],
+          isError: true,
+        };
+      }
     },
   );
 
@@ -148,6 +167,7 @@ function buildServer(): McpServer {
           .describe("Simulation id returned by simulate_operation"),
       },
     },
+    // Fix #3: audit failures; fix #5: redact rollback SQL body
     async ({ simulation_id }) => {
       const sim = getSimulation(simulation_id);
       const refusal = refusalReason(sim, simulation_id);
@@ -155,37 +175,50 @@ function buildServer(): McpServer {
         appendAuditEvent("refusal", {
           simulation_id,
           reason: refusal,
+          status: "refused",
         });
         return {
           content: [{ type: "text", text: refusal }],
           isError: true,
         };
       }
-      const pool = poolFor(cfg, cfg.productionDb);
-      const before = await fingerprintDatabase(cfg, cfg.productionDb);
-      await pool.query(sim!.operation);
-      const after = await fingerprintDatabase(cfg, cfg.productionDb);
-      const changed = after.filter(
-        (a) => before.find((b) => b.table === a.table)?.checksum !== a.checksum,
-      );
-      const payload = {
-        executed: true,
-        database: cfg.productionDb,
-        simulationId: simulation_id,
-        tablesChanged: changed.map((c) => c.table),
-        verifiedRollbackOnFile: sim!.rollback,
-      };
-      appendAuditEvent("execute", {
-        ...payload,
-      });
-      return {
-        content: [
-          {
-            type: "text",
-            text: JSON.stringify(payload, null, 2),
-          },
-        ],
-      };
+      try {
+        const pool = poolFor(cfg, cfg.productionDb);
+        const before = await fingerprintDatabase(cfg, cfg.productionDb);
+        await pool.query(sim!.operation);
+        const after = await fingerprintDatabase(cfg, cfg.productionDb);
+        const changed = after.filter(
+          (a) => before.find((b) => b.table === a.table)?.checksum !== a.checksum,
+        );
+        const payload = {
+          executed: true,
+          database: cfg.productionDb,
+          simulationId: simulation_id,
+          tablesChanged: changed.map((c) => c.table),
+          // Fix #5: redact full rollback SQL — expose sha256 + length only
+          rollbackSha256: sha256(sim!.rollback),
+          rollbackLength: sim!.rollback.length,
+        };
+        appendAuditEvent("execute", { ...payload, status: "ok" });
+        return {
+          content: [
+            {
+              type: "text",
+              text: JSON.stringify(payload, null, 2),
+            },
+          ],
+        };
+      } catch (err) {
+        appendAuditEvent("execute", {
+          simulation_id,
+          status: "error",
+          error: String(err),
+        });
+        return {
+          content: [{ type: "text", text: `Execution failed: ${String(err)}` }],
+          isError: true,
+        };
+      }
     },
   );
 
@@ -194,7 +227,7 @@ function buildServer(): McpServer {
     {
       title: "Read audit log",
       description:
-        "Return the last 50 SafeRun audit events (simulate, execute, refusal, analyze) from the append-only audit log. Read-only.",
+        "Return the last 50 SafeRun audit events (simulate, execute, refusal, analyze) from the append-only audit log. Read-only. Rollback SQL bodies are redacted; only sha256 and length are stored.",
       annotations: { readOnlyHint: true },
       inputSchema: {
         limit: z
