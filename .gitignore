@@ -9,3 +9,4 @@ redteam-report.json
 
 # internal hostile-judge notes, not for publication
 docs/JUDGE-VERDICT.md
+demo/out/

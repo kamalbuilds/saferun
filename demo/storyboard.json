@@ -1,0 +1,41 @@
+[
+ {"start": 0.0,  "end": 4.68,  "img": "cards/title.png",  "zoom": 1.03, "caption": "In July 2025, an AI agent deleted a production database."},
+ {"start": 4.68, "end": 9.22,  "img": "cards/title.png",  "zoom": 1.03, "zoom_from": 1.03, "caption": "It ignored the instruction to stop, and claimed the data was unrecoverable."},
+ {"start": 9.22, "end": 12.28, "img": "cards/protocol.png", "zoom": 1.025, "caption": "Nothing stood between the model and the data."},
+ {"start": 12.28,"end": 15.92, "img": "cards/protocol.png", "zoom": 1.025, "zoom_from": 1.025, "caption": "SafeRun is that missing layer, built on TrueForge."},
+
+ {"start": 15.92,"end": 21.04, "img": "cards/ask.png", "zoom": 1.03, "caption": "Watch what happens when we ask it to permanently delete every 2020 rental for store 2."},
+ {"start": 21.04,"end": 23.40, "img": "cards/ask.png", "zoom": 1.03, "zoom_from": 1.03, "caption": "A real Postgres database. Pagila. 16,044 rentals. No mocks."},
+
+ {"start": 23.40,"end": 28.24, "img": "frames/f01.png", "zoom": 1.03, "caption": "Instead of obeying, SafeRun investigates through read-only MCP tools."},
+ {"start": 28.24,"end": 32.16, "img": "frames/f02.png", "zoom": 1.03, "caption": "It maps the foreign keys and finds something we didn't know."},
+ {"start": 32.16,"end": 35.16, "img": "frames/f02.png", "zoom": 1.03, "zoom_from": 1.03, "pan": 0.35, "caption": "Every payment partition references rentals."},
+ {"start": 35.16,"end": 39.36, "img": "frames/f03.png", "zoom": 1.03, "caption": "The 90-row delete is secretly a 180-row operation."},
+ {"start": 39.36,"end": 41.84, "img": "frames/f03.png", "zoom": 1.03, "zoom_from": 1.03, "pan": 0.3, "caption": "It surfaces this hidden blast radius"},
+ {"start": 41.84,"end": 44.44, "img": "frames/f03.png", "zoom": 1.05, "zoom_from": 1.03, "pan": 0.3, "caption": "and asks which scope we actually meant."},
+
+ {"start": 44.44,"end": 49.52, "img": "frames/f04.png", "zoom": 1.03, "caption": "Then it clones the entire production database and runs the delete inside the clone,"},
+ {"start": 49.52,"end": 52.84, "img": "frames/f04.png", "zoom": 1.03, "zoom_from": 1.03, "pan": 0.4, "caption": "measuring the exact damage, table by table."},
+
+ {"start": 52.84,"end": 56.44, "img": "frames/f06.png", "zoom": 1.03, "caption": "It writes the rollback, executes that in the clone too,"},
+ {"start": 56.44,"end": 61.28, "img": "frames/f00.png", "zoom": 1.03, "caption": "and verifies every table checksum returns to its pre-operation state."},
+ {"start": 61.28,"end": 65.12, "img": "frames/f07.png", "zoom": 1.03, "caption": "Not \u201care you sure?\u201d, but \u201cI already tested your undo.\u201d"},
+ {"start": 65.12,"end": 67.76, "img": "frames/f07.png", "zoom": 1.03, "zoom_from": 1.03, "pan": 0.25, "caption": "It works. Here is the proof."},
+
+ {"start": 67.76,"end": 71.30, "img": "frames/approval_gate.png", "zoom": 1.02,
+  "caption": "Only then does it stop at TrueForge's native approval gate."},
+ {"start": 71.30,"end": 73.60, "img": "frames/approval_gate.png", "zoom": 1.02, "zoom_from": 1.02,
+  "caption": "A human clicks Allow.",
+  "click": {"x": 0.7618, "y": 0.6039, "at": 0.42}},
+
+ {"start": 73.60,"end": 78.52, "img": "frames/f05.png", "zoom": 1.03, "caption": "The operation executes against production, with the verified rollback on file."},
+ {"start": 78.52,"end": 83.44, "img": "frames/f05.png", "zoom": 1.03, "zoom_from": 1.03, "pan": 0.35, "caption": "Afterwards we restored production using the agent's own rollback SQL."},
+ {"start": 83.44,"end": 85.16, "img": "cards/proof.png", "zoom": 1.02, "caption": "Round trip proven."},
+
+ {"start": 85.16,"end": 90.96, "img": "cards/gate.png", "zoom": 1.03, "caption": "The execute tool refuses, at code level, any simulation whose rollback was not verified."},
+ {"start": 90.96,"end": 93.36, "img": "cards/gate.png", "zoom": 1.03, "zoom_from": 1.03, "caption": "The safety boundary is unpromptable."},
+
+ {"start": 93.36,"end": 99.76, "img": "cards/close.png", "zoom": 1.03, "caption": "MCP tools, skills, sandbox, approvals, ask-user questions, persistent sessions."},
+ {"start": 99.76,"end": 102.40,"img": "cards/close.png", "zoom": 1.03, "zoom_from": 1.03, "caption": "Every harness feature, load-bearing."},
+ {"start": 102.40,"end": 106.40,"img": "cards/close.png", "zoom": 1.05, "zoom_from": 1.03, "caption": "SafeRun: agents you can hand the keys to."}
+]

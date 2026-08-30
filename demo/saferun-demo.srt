@@ -1,0 +1,111 @@
+1
+00:00:00,000 --> 00:00:04,680
+In July 2025, an AI agent deleted a production database.
+
+2
+00:00:04,680 --> 00:00:09,220
+It ignored the instruction to stop, and claimed the data was unrecoverable.
+
+3
+00:00:09,220 --> 00:00:12,280
+Nothing stood between the model and the data.
+
+4
+00:00:12,280 --> 00:00:15,920
+SafeRun is that missing layer, built on TrueForge.
+
+5
+00:00:15,920 --> 00:00:21,040
+Watch what happens when we ask it to permanently delete every 2020 rental for store 2.
+
+6
+00:00:21,040 --> 00:00:23,400
+A real Postgres database. Pagila. 16,044 rentals. No mocks.
+
+7
+00:00:23,400 --> 00:00:28,240
+Instead of obeying, SafeRun investigates through read-only MCP tools.
+
+8
+00:00:28,240 --> 00:00:32,160
+It maps the foreign keys and finds something we didn't know.
+
+9
+00:00:32,160 --> 00:00:35,160
+Every payment partition references rentals.
+
+10
+00:00:35,160 --> 00:00:39,360
+The 90-row delete is secretly a 180-row operation.
+
+11
+00:00:39,360 --> 00:00:41,840
+It surfaces this hidden blast radius
+
+12
+00:00:41,840 --> 00:00:44,440
+and asks which scope we actually meant.
+
+13
+00:00:44,440 --> 00:00:49,520
+Then it clones the entire production database and runs the delete inside the clone,
+
+14
+00:00:49,520 --> 00:00:52,840
+measuring the exact damage, table by table.
+
+15
+00:00:52,840 --> 00:00:56,440
+It writes the rollback, executes that in the clone too,
+
+16
+00:00:56,440 --> 00:01:01,280
+and verifies every table checksum returns to its pre-operation state.
+
+17
+00:01:01,280 --> 00:01:05,120
+Not “are you sure?”, but “I already tested your undo.”
+
+18
+00:01:05,120 --> 00:01:07,760
+It works. Here is the proof.
+
+19
+00:01:07,760 --> 00:01:11,300
+Only then does it stop at TrueForge's native approval gate.
+
+20
+00:01:11,300 --> 00:01:13,600
+A human clicks Allow.
+
+21
+00:01:13,600 --> 00:01:18,520
+The operation executes against production, with the verified rollback on file.
+
+22
+00:01:18,520 --> 00:01:23,440
+Afterwards we restored production using the agent's own rollback SQL.
+
+23
+00:01:23,440 --> 00:01:25,160
+Round trip proven.
+
+24
+00:01:25,160 --> 00:01:30,960
+The execute tool refuses, at code level, any simulation whose rollback was not verified.
+
+25
+00:01:30,960 --> 00:01:33,360
+The safety boundary is unpromptable.
+
+26
+00:01:33,360 --> 00:01:39,760
+MCP tools, skills, sandbox, approvals, ask-user questions, persistent sessions.
+
+27
+00:01:39,760 --> 00:01:42,400
+Every harness feature, load-bearing.
+
+28
+00:01:42,400 --> 00:01:46,400
+SafeRun: agents you can hand the keys to.
