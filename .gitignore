@@ -9,3 +9,6 @@ redteam-report.json
 
 # internal hostile-judge notes, not for publication
 docs/JUDGE-VERDICT.md
+
+# intermediate video frame sequence (851MB, regenerated from saferun-demo.mp4)
+demo/out/
